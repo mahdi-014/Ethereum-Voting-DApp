@@ -247,7 +247,7 @@ Running Mocha tests
 ## 6. Deployment & Operational Guide
 
 ### 6.1 Prerequisites
-* **Operating System:** Ubuntu Linux 22.04+ (or macOS / Windows WSL2)
+* **Operating System:** Ubuntu 26.04.1 LTS
 * **Node.js:** `v22.13.0` or higher
 * **npm:** `v10.x` or higher
 
@@ -313,3 +313,4 @@ The Ethereum Voting DApp project successfully fulfills all objectives set forth 
 
 ### Project Certification:
 This project report was authored by **Mahdi, Nazmul, Shormi, Tamim, Nasim, and Abdullah** of **Batch 19, Department of CIS, Daffodil International University (DIU)** under the guidance of **Md Jahangir Hossain (MJH)**.
+
