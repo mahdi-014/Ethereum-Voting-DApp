@@ -1,0 +1,49 @@
+{
+  "_format": "hh3-sol-build-info-1",
+  "id": "solc-0_8_34-9de4bba6120d61edacfeba41fb4da4b083ba5383",
+  "solcVersion": "0.8.34",
+  "solcLongVersion": "0.8.34+commit.80d5c536",
+  "compilerType": "solc",
+  "toolVersions": {
+    "hardhat": "3.21.1"
+  },
+  "userSourceNameMap": {
+    "contracts/Voting.sol": "project/contracts/Voting.sol"
+  },
+  "input": {
+    "language": "Solidity",
+    "settings": {
+      "evmVersion": "osaka",
+      "optimizer": {
+        "enabled": true,
+        "runs": 200
+      },
+      "outputSelection": {
+        "*": {
+          "": [
+            "ast"
+          ],
+          "*": [
+            "abi",
+            "evm.bytecode.linkReferences",
+            "evm.bytecode.object",
+            "evm.bytecode.opcodes",
+            "evm.bytecode.sourceMap",
+            "evm.deployedBytecode.immutableReferences",
+            "evm.deployedBytecode.linkReferences",
+            "evm.deployedBytecode.object",
+            "evm.deployedBytecode.opcodes",
+            "evm.deployedBytecode.sourceMap",
+            "evm.methodIdentifiers"
+          ]
+        }
+      },
+      "remappings": []
+    },
+    "sources": {
+      "project/contracts/Voting.sol": {
+        "content": "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.34;\n\ncontract Voting {\n    address public owner;\n\n    struct Candidate {\n        uint256 id;\n        string name;\n        uint256 voteCount;\n        bool exists;\n    }\n\n    struct Voter {\n        address voterAddress;\n        string name;\n        bool isRegistered;\n        bool hasVoted;\n        uint256 votedCandidateId;\n    }\n\n    Candidate[] private candidates;\n    address[] private registeredVotersList;\n    address[] private votedAddressesList;\n\n    mapping(address => bool) public hasVoted;\n    mapping(address => Voter) public voters;\n\n    event CandidateAdded(uint256 indexed candidateId, string name);\n    event CandidateUpdated(uint256 indexed candidateId, string newName);\n    event CandidateDeleted(uint256 indexed candidateId);\n    event VoterAdded(address indexed voter, string name);\n    event VoterUpdated(address indexed voter, string newName);\n    event VoterDeleted(address indexed voter);\n    event VoterReset(address indexed voter);\n    event VoteCast(uint256 indexed candidateId, address indexed voter);\n    event ElectionReset();\n    event SystemReset();\n\n    modifier onlyOwner() {\n        require(msg.sender == owner, \"Only owner can add candidates\");\n        _;\n    }\n\n    constructor() {\n        owner = msg.sender;\n    }\n\n    // =============================================================\n    // Candidate Management (Admin)\n    // =============================================================\n\n    function addCandidate(string memory name) external onlyOwner {\n        require(bytes(name).length > 0, \"Candidate name cannot be empty\");\n\n        uint256 candidateId = candidates.length;\n\n        candidates.push(\n            Candidate({\n                id: candidateId,\n                name: name,\n                voteCount: 0,\n                exists: true\n            })\n        );\n\n        emit CandidateAdded(candidateId, name);\n    }\n\n    function editCandidate(uint256 candidateId, string memory newName) external onlyOwner {\n        require(candidateId < candidates.length, \"Invalid candidate ID\");\n        require(candidates[candidateId].exists, \"Candidate does not exist\");\n        require(bytes(newName).length > 0, \"Candidate name cannot be empty\");\n\n        candidates[candidateId].name = newName;\n        emit CandidateUpdated(candidateId, newName);\n    }\n\n    function deleteCandidate(uint256 candidateId) external onlyOwner {\n        require(candidateId < candidates.length, \"Invalid candidate ID\");\n        require(candidates[candidateId].exists, \"Candidate does not exist\");\n\n        candidates[candidateId].exists = false;\n        emit CandidateDeleted(candidateId);\n    }\n\n    function candidateCount() external view returns (uint256) {\n        return candidates.length;\n    }\n\n    function getCandidate(\n        uint256 candidateId\n    )\n        external\n        view\n        returns (uint256 id, string memory name, uint256 voteCount, bool exists)\n    {\n        require(candidateId < candidates.length, \"Invalid candidate ID\");\n\n        Candidate storage candidate = candidates[candidateId];\n\n        return (candidate.id, candidate.name, candidate.voteCount, candidate.exists);\n    }\n\n    // =============================================================\n    // Voting Logic\n    // =============================================================\n\n    function vote(uint256 candidateId) external {\n        require(candidateId < candidates.length, \"Invalid candidate ID\");\n        require(candidates[candidateId].exists, \"Candidate does not exist\");\n        require(!hasVoted[msg.sender], \"Already voted\");\n\n        hasVoted[msg.sender] = true;\n        votedAddressesList.push(msg.sender);\n        candidates[candidateId].voteCount += 1;\n\n        if (voters[msg.sender].isRegistered) {\n            voters[msg.sender].hasVoted = true;\n            voters[msg.sender].votedCandidateId = candidateId;\n        }\n\n        emit VoteCast(candidateId, msg.sender);\n    }\n\n    // =============================================================\n    // Voter Management (Admin)\n    // =============================================================\n\n    function addVoter(address voterAddress, string memory name) external onlyOwner {\n        require(voterAddress != address(0), \"Invalid voter address\");\n        require(bytes(name).length > 0, \"Voter name cannot be empty\");\n\n        if (!voters[voterAddress].isRegistered) {\n            registeredVotersList.push(voterAddress);\n        }\n\n        voters[voterAddress] = Voter({\n            voterAddress: voterAddress,\n            name: name,\n            isRegistered: true,\n            hasVoted: hasVoted[voterAddress],\n            votedCandidateId: voters[voterAddress].votedCandidateId\n        });\n\n        emit VoterAdded(voterAddress, name);\n    }\n\n    function editVoter(address voterAddress, string memory newName) external onlyOwner {\n        require(voters[voterAddress].isRegistered, \"Voter not registered\");\n        require(bytes(newName).length > 0, \"Voter name cannot be empty\");\n\n        voters[voterAddress].name = newName;\n        emit VoterUpdated(voterAddress, newName);\n    }\n\n    function deleteVoter(address voterAddress) external onlyOwner {\n        require(voters[voterAddress].isRegistered, \"Voter not registered\");\n\n        voters[voterAddress].isRegistered = false;\n\n        // Remove from registeredVotersList\n        for (uint256 i = 0; i < registeredVotersList.length; i++) {\n            if (registeredVotersList[i] == voterAddress) {\n                registeredVotersList[i] = registeredVotersList[registeredVotersList.length - 1];\n                registeredVotersList.pop();\n                break;\n            }\n        }\n\n        emit VoterDeleted(voterAddress);\n    }\n\n    function resetVoterStatus(address voterAddress) external onlyOwner {\n        require(hasVoted[voterAddress], \"Voter has not voted\");\n\n        hasVoted[voterAddress] = false;\n        if (voters[voterAddress].isRegistered) {\n            voters[voterAddress].hasVoted = false;\n            uint256 candidateId = voters[voterAddress].votedCandidateId;\n            if (candidateId < candidates.length && candidates[candidateId].voteCount > 0) {\n                candidates[candidateId].voteCount -= 1;\n            }\n        }\n\n        emit VoterReset(voterAddress);\n    }\n\n    function voterCount() external view returns (uint256) {\n        return registeredVotersList.length;\n    }\n\n    function getVoter(uint256 index) external view returns (\n        address voterAddress,\n        string memory name,\n        bool isRegistered,\n        bool voted\n    ) {\n        require(index < registeredVotersList.length, \"Index out of bounds\");\n        address addr = registeredVotersList[index];\n        Voter storage v = voters[addr];\n        return (v.voterAddress, v.name, v.isRegistered, hasVoted[addr]);\n    }\n\n    // =============================================================\n    // System Reset Functions (Admin)\n    // =============================================================\n\n    // Reset votes only: zero out vote counts and clear hasVoted for all voters\n    function resetElection() external onlyOwner {\n        for (uint256 i = 0; i < candidates.length; i++) {\n            candidates[i].voteCount = 0;\n        }\n\n        for (uint256 i = 0; i < votedAddressesList.length; i++) {\n            hasVoted[votedAddressesList[i]] = false;\n            if (voters[votedAddressesList[i]].isRegistered) {\n                voters[votedAddressesList[i]].hasVoted = false;\n            }\n        }\n        delete votedAddressesList;\n\n        emit ElectionReset();\n    }\n\n    // Factory reset: clear all candidates, voters, and vote history completely\n    function resetAll() external onlyOwner {\n        delete candidates;\n\n        for (uint256 i = 0; i < votedAddressesList.length; i++) {\n            hasVoted[votedAddressesList[i]] = false;\n        }\n        delete votedAddressesList;\n\n        for (uint256 i = 0; i < registeredVotersList.length; i++) {\n            delete voters[registeredVotersList[i]];\n        }\n        delete registeredVotersList;\n\n        emit SystemReset();\n    }\n}\n"
+      }
+    }
+  }
+}
