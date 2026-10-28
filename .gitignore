@@ -1,0 +1,29 @@
+# Node modules
+node_modules/
+
+# Hardhat Build Artifacts & Cache
+artifacts/
+cache/
+types/
+
+# Build and Bundling Output
+dist/
+bundle/
+.vite/
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Test & coverage output
+coverage/
+coverage.json
+.gas-snapshot
+snapshots/
+
+# OS and Editor files
+.DS_Store
+*.log
+.vscode/
+.idea/

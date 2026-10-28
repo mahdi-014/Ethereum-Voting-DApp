@@ -1,0 +1,33 @@
+{
+  "name": "VotingDApp",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "compile": "HARDHAT_DISABLE_TELEMETRY=true hardhat compile",
+    "test": "HARDHAT_DISABLE_TELEMETRY=true hardhat test",
+    "node": "HARDHAT_DISABLE_TELEMETRY=true hardhat node",
+    "deploy:local": "HARDHAT_DISABLE_TELEMETRY=true hardhat ignition deploy ignition/modules/Voting.ts --network localhost",
+    "verify:local": "HARDHAT_DISABLE_TELEMETRY=true hardhat run scripts/verify-voting.ts --network localhost",
+    "vote:local": "HARDHAT_DISABLE_TELEMETRY=true hardhat run scripts/cast-vote.ts --network localhost",
+    "frontend:install": "npm --prefix frontend install",
+    "frontend:dev": "npm --prefix frontend run dev",
+    "frontend:build": "npm --prefix frontend run build",
+    "frontend:lint": "npm --prefix frontend run lint"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-ethers": "^4.2.1",
+    "@nomicfoundation/hardhat-ignition": "^3.1.9",
+    "@nomicfoundation/hardhat-ignition-ethers": "^3.1.6",
+    "@nomicfoundation/hardhat-toolbox-mocha-ethers": "^4.0.0",
+    "@types/chai": "^5.2.3",
+    "@types/chai-as-promised": "^8.0.2",
+    "@types/mocha": "^10.0.10",
+    "@types/node": "^22.20.5",
+    "chai": "^6.3.0",
+    "ethers": "^6.17.0",
+    "forge-std": "github:foundry-rs/forge-std#v1.16.2",
+    "hardhat": "^3.21.1",
+    "mocha": "^12.0.3",
+    "typescript": "~6.0.3"
+  }
+}
