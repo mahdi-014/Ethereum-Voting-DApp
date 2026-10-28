@@ -26,7 +26,7 @@ flowchart TD
 
     subgraph Tooling_Layer["Deployment & Automated Testing"]
         Ignition["Hardhat Ignition\nignition/modules/Voting.ts"]
-        Tests["Test Suites\n- Foundry/Solidity tests (Counter.t.sol)\n- TypeScript/Mocha integration tests (Voting.ts - 16 passing)"]
+        Tests["Test Suites\n- TypeScript/Mocha integration tests (Voting.ts - 11 passing)"]
         Scripts["Verification Scripts\n- verify-voting.ts\n- cast-vote.ts"]
         Ignition -->|Deploys & Registers Candidates| Contract
         Tests -->|Validates Rules, Admin & Reverts| Contract
@@ -71,24 +71,20 @@ flowchart TD
 
 ```text
 VotingDApp/
-├── contracts/                      # Solidity smart contracts and unit tests
-│   ├── Counter.sol                 # Hardhat template baseline contract
-│   ├── Counter.t.sol               # Foundry-style Solidity unit test
+├── contracts/                      # Solidity smart contracts
 │   └── Voting.sol                  # Main Voting smart contract (CRUD & Reset)
 ├── ignition/                       # Hardhat Ignition deployment framework
 │   ├── deployments/chain-31337/    # Deployment artifacts & address registry
 │   └── modules/
-│       ├── Counter.ts
 │       └── Voting.ts               # Ignition module for Voting deployment
 ├── scripts/                        # Standalone execution and verification scripts
 │   ├── cast-vote.ts                # Command-line vote submission helper
-│   ├── send-op-tx.ts
 │   └── verify-voting.ts            # CLI deployment and candidate verification
-├── test/                           # Hardhat test suites (16 passing tests)
-│   ├── Counter.ts
+├── test/                           # Hardhat test suites (11 passing tests)
 │   └── Voting.ts                   # Comprehensive Mocha/Chai integration test suite
 ├── frontend/                       # React + TypeScript + Vite user interface
 │   ├── public/
+│   │   └── favicon.svg             # Application favicon
 │   ├── src/
 │   │   ├── contracts/
 │   │   │   └── Voting.json         # Deployed contract ABI and artifact
@@ -109,7 +105,7 @@ VotingDApp/
 
 ## 3. Automated Testing
 
-The project includes 16 automated tests covering unit logic, candidate CRUD, voter registry CRUD, single-vote enforcement, and system resets:
+The project includes 11 automated integration tests covering unit logic, candidate CRUD, voter registry CRUD, single-vote enforcement, and system resets:
 
 ```bash
 npm test
@@ -117,16 +113,7 @@ npm test
 
 ### Passing Test Suites Summary:
 ```text
-Running Solidity tests
-  contracts/Counter.t.sol:CounterTest
-    ✔ test_InitialValue()
-    ✔ test_IncByZero()
-    ✔ testFuzz_Inc(uint8) (runs: 256)
-
 Running Mocha tests
-  Counter
-    ✔ Should emit the Increment event when calling the inc() function
-    ✔ The sum of the Increment events should match the current value
 
   Voting
     ✔ Should allow the owner to add candidates
@@ -141,7 +128,7 @@ Running Mocha tests
     ✔ Should allow the owner to reset the election votes without deleting candidates
     ✔ Should allow the owner to factory reset the entire system
 
-16 passing (3 solidity, 13 mocha)
+11 passing (11 mocha)
 ```
 
 ---

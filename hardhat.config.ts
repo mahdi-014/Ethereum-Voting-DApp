@@ -31,11 +31,6 @@ export default defineConfig({
       chainType: "l1",
     },
 
-    hardhatOp: {
-      type: "edr-simulated",
-      chainType: "op",
-    },
-
     localhost: {
       type: "http",
       chainType: "l1",
