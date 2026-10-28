@@ -22,3 +22,4 @@ const alice = await voting.getCandidate(0);
 console.log("Candidate:", alice.name);
 console.log("Alice's vote count:", alice.voteCount.toString());
 console.log("Voter has voted:", await voting.hasVoted(voter.address));
+

@@ -17,3 +17,4 @@ for (let id = 0n; id < candidateCount; id++) {
   console.log(`Votes: ${candidate.voteCount.toString()}`);
   console.log("-----------------------------");
 }
+
