@@ -1,7 +1,8 @@
 # Ethereum Voting Decentralized Application (DApp)
 
 **Midterm Project Submission**  
-**Course:** Distributed Systems & Blockchain Development (IBA, CIS, DIU)  
+**Department:** Department of CIS | Batch 19 | IBC Midterm Project  
+**Team Members:** Mahdi | Nazmul | Shormi | Tamim | Nasim | Abdullah  
 **Laboratory Guidelines Reference:** Md Jahangir Hossain (MJH)  
 **Technology Stack:** Solidity `^0.8.34` | Hardhat 3.x | ethers.js v6.x | Hardhat Ignition | React 19 | Vite | TypeScript | MetaMask
 

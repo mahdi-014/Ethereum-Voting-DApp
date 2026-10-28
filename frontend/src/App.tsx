@@ -674,7 +674,7 @@ function App() {
           <div className="brand-icon">🗳️</div>
           <div>
             <h1 className="brand-title">Ethereum Voting DApp</h1>
-            <p className="brand-subtitle">IBA, CIS, DIU · Midterm Project</p>
+            <p className="brand-subtitle">Department of CIS · Batch 19 · IBC Midterm Project</p>
           </div>
         </div>
 
@@ -1430,8 +1430,15 @@ function App() {
 
       {/* Footer */}
       <footer>
-        <div>Department of Computer Information Systems (CIS) · IBA · DIU</div>
-        <div>Smart Contract: <code>{CONTRACT_ADDRESS}</code> · Hardhat 3 · ethers.js v6</div>
+        <div style={{ fontWeight: 600, color: "#e2e8f0", fontSize: "0.95rem", letterSpacing: "0.02em" }}>
+          Department of CIS | Batch 19 | IBC Midterm Project
+        </div>
+        <div style={{ color: "#38bdf8", fontWeight: 500, fontSize: "0.88rem", marginTop: "0.25rem" }}>
+          By: Mahdi | Nazmul | Shormi | Tamim | Nasim | Abdullah
+        </div>
+        <div style={{ marginTop: "0.4rem", fontSize: "0.8rem", color: "#64748b" }}>
+          Smart Contract: <code>{CONTRACT_ADDRESS}</code> · Hardhat 3 · ethers.js v6
+        </div>
       </footer>
     </div>
   );
