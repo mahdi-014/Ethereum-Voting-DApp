@@ -1,0 +1,49 @@
+{
+  "_format": "hh3-sol-build-info-1",
+  "id": "solc-0_8_34-adf542354dc970890e7c149dcf79658a3e2f188e",
+  "solcVersion": "0.8.34",
+  "solcLongVersion": "0.8.34+commit.80d5c536",
+  "compilerType": "solc",
+  "toolVersions": {
+    "hardhat": "3.22.0"
+  },
+  "userSourceNameMap": {
+    "contracts/Voting.sol": "project/contracts/Voting.sol"
+  },
+  "input": {
+    "language": "Solidity",
+    "settings": {
+      "evmVersion": "osaka",
+      "optimizer": {
+        "enabled": true,
+        "runs": 200
+      },
+      "outputSelection": {
+        "*": {
+          "": [
+            "ast"
+          ],
+          "*": [
+            "abi",
+            "evm.bytecode.linkReferences",
+            "evm.bytecode.object",
+            "evm.bytecode.opcodes",
+            "evm.bytecode.sourceMap",
+            "evm.deployedBytecode.immutableReferences",
+            "evm.deployedBytecode.linkReferences",
+            "evm.deployedBytecode.object",
+            "evm.deployedBytecode.opcodes",
+            "evm.deployedBytecode.sourceMap",
+            "evm.methodIdentifiers"
+          ]
+        }
+      },
+      "remappings": []
+    },
+    "sources": {
+      "project/contracts/Voting.sol": {
+        "content": "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.24;\n\ncontract Voting {\n    struct Candidate {\n        uint256 id;\n        string name;\n        uint256 voteCount;\n    }\n\n    address public owner;\n    uint256 public candidateCount;\n    mapping(uint256 => Candidate) public candidates;\n    mapping(address => bool) public hasVoted;\n    mapping(bytes32 => bool) private candidateNameExists;\n\n    event CandidateAdded(uint256 indexed candidateId, string name);\n    event VoteCast(address indexed voter, uint256 indexed candidateId);\n\n    modifier onlyOwner() {\n        require(msg.sender == owner, \"Only owner can perform this action\");\n        _;\n    }\n\n    constructor() {\n        owner = msg.sender;\n    }\n\n    function _hasNonWhitespace(string memory _str) private pure returns (bool) {\n        bytes memory b = bytes(_str);\n        for (uint256 i = 0; i < b.length; i++) {\n            bytes1 ch = b[i];\n            if (ch != 0x20 && ch != 0x09 && ch != 0x0A && ch != 0x0D) {\n                return true;\n            }\n        }\n        return false;\n    }\n\n    function _toLowerHash(string memory _str) private pure returns (bytes32) {\n        bytes memory b = bytes(_str);\n        bytes memory lower = new bytes(b.length);\n        for (uint256 i = 0; i < b.length; i++) {\n            bytes1 ch = b[i];\n            if (ch >= 0x41 && ch <= 0x5A) {\n                lower[i] = bytes1(uint8(ch) + 32);\n            } else {\n                lower[i] = ch;\n            }\n        }\n        return keccak256(lower);\n    }\n\n    function addCandidate(string memory _name) public onlyOwner {\n        require(bytes(_name).length > 0 && _hasNonWhitespace(_name), \"Candidate name cannot be empty\");\n        bytes32 nameHash = _toLowerHash(_name);\n        require(!candidateNameExists[nameHash], \"Candidate already exists\");\n\n        candidateNameExists[nameHash] = true;\n        candidateCount++;\n        candidates[candidateCount] = Candidate(candidateCount, _name, 0);\n        emit CandidateAdded(candidateCount, _name);\n    }\n\n    function vote(uint256 _candidateId) public {\n        require(!hasVoted[msg.sender], \"You have already voted\");\n        require(_candidateId > 0 && _candidateId <= candidateCount, \"Invalid candidate ID\");\n\n        hasVoted[msg.sender] = true;\n        candidates[_candidateId].voteCount++;\n        emit VoteCast(msg.sender, _candidateId);\n    }\n}\n"
+      }
+    }
+  }
+}

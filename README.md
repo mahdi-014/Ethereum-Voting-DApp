@@ -12,9 +12,10 @@ This decentralized application allows users to view registered candidates and ca
 - **Single-Vote Enforcement**: The contract tracks voter addresses to ensure each wallet can only vote once.
 - **Pre-Registered Candidates**: Automatically initializes candidate #1 (**Alice**) and candidate #2 (**Bob**) with 0 votes upon deployment.
 - **MetaMask Integration**: Secure browser-based transaction signing using ethers.js v6.
-- **Automatic Network Validation**: Detects whether MetaMask is connected to the local development network (Chain ID: `31337`) and offers one-click network switching or addition.
-- **Real-Time Blockchain Reads**: Reads candidate counts, names, vote counts, and voting status directly from on-chain state.
-- **Comprehensive Test Suite**: 11 unit tests covering deployment, owner privileges, candidate registration, voting flow, event emissions, double-voting prevention, and error reverts.
+- **Automatic Network Validation**: Detects whether MetaMask is connected to the local development network (Chain ID: `31337`)—even before connecting a wallet—and offers one-click network switching or addition.
+- **Real-Time Blockchain Reads**: Bypasses MetaMask's internal RPC cache using a direct `ethers.JsonRpcProvider` (`cacheTimeout: -1`) to read candidate counts, names, vote counts, and voting status accurately.
+- **Automatic Nonce Sync & Vote Reset**: Automatically syncs the local Hardhat node nonce via `hardhat_setNonce` on `Nonce too high` errors, and includes `npm run reset` to reset elections to `0 / 0` without restarting the node.
+- **Comprehensive Test Suite**: 16 Hardhat Mocha/Chai contract tests and 8 Vitest UI/integration tests covering deployment, owner privileges, candidate validation, voting flow, event emissions, double-voting prevention, error diagnostics, and live vote totals.
 
 ---
 
@@ -25,7 +26,7 @@ This decentralized application allows users to view registered candidates and ca
 - **Toolbox & Testing**: `@nomicfoundation/hardhat-toolbox-mocha-ethers`, Mocha `12.0.3`, Chai `6.3.0`
 - **Deployment**: Hardhat Ignition `3.1.10`
 - **Web3 Library**: ethers.js `6.17.0`
-- **Frontend**: React 18, Vite 6, JavaScript, CSS3
+- **Frontend**: React 18, Vite 6, JavaScript, CSS3, Vitest + Testing Library (`jsdom`)
 - **Runtime Environment**: Node.js 22 LTS, Ubuntu 24.04 LTS (WSL2)
 
 ---
@@ -37,17 +38,18 @@ VotingDApp/
 ├── contracts/
 │   └── Voting.sol                     # Voting smart contract
 ├── ignition/
-│   └── modules/
-│       └── Voting.ts                  # Hardhat Ignition deployment module
+│   ├── modules/
+│   │   └── Voting.ts                  # Hardhat Ignition deployment module
 │   └── deployments/                   # Ignition deployment artifacts
 │       └── chain-31337/
 │           └── deployed_addresses.json
 ├── test/
-│   └── Voting.ts                      # 11 Mocha/Chai unit tests
+│   └── Voting.ts                      # 16 Mocha/Chai unit tests
 ├── scripts/
 │   ├── cast-vote.js                   # CLI voting script (Account index 2)
+│   ├── reset-votes.ts                 # Redeploys fresh 0/0 contract using Account #19
 │   ├── verify-voting.ts               # Local contract verification script
-│   └── final-verification.sh          # Full test & verification runner
+│   └── final-verification.sh          # Full test, build & verification runner
 ├── frontend/                          # React + Vite frontend application
 │   ├── index.html
 │   ├── vite.config.js
@@ -55,6 +57,7 @@ VotingDApp/
 │   └── src/
 │       ├── main.jsx
 │       ├── App.jsx                    # DApp user interface & MetaMask logic
+│       ├── App.test.jsx               # 8 Vitest UI & integration tests
 │       ├── index.css                  # Responsive UI styling
 │       └── contracts/
 │           ├── Voting.json            # Contract ABI for frontend
@@ -69,7 +72,7 @@ VotingDApp/
 
 ## Current Local Deployment Details
 
-- **Contract Address**: `0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9`
+- **Contract Address**: `0x5FbDB2315678afecb367f032d93F642f64180aa3`
 - **Network Name**: Hardhat Local
 - **RPC URL**: `http://127.0.0.1:8545`
 - **Chain ID**: `31337` (`0x7a69`)
@@ -153,7 +156,7 @@ Verify that the deployment was successful and matches the expected on-chain stat
 npx hardhat run --network localhost scripts/verify-voting.ts
 ```
 
-*Expected output: Contract deployed at `0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9`, candidate count 2, Alice (0 votes), Bob (0 votes).*
+*Expected output: Contract deployed at `0x5FbDB2315678afecb367f032d93F642f64180aa3`, candidate count 2, Alice (0 votes), Bob (0 votes).*
 
 ### Step 3: Terminal 2 — Verify Frontend Contract Address
 
@@ -163,7 +166,7 @@ Confirm that `frontend/src/contracts/contractConfig.js` points to the deployed a
 cat frontend/src/contracts/contractConfig.js
 ```
 
-*The active deployment address on Hardhat local is `0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9`.*
+*The active deployment address on Hardhat local is `0x5FbDB2315678afecb367f032d93F642f64180aa3`.*
 
 ### Step 4: Terminal 3 — Start the React Frontend
 
@@ -246,6 +249,15 @@ npm run vote
 
 The script automatically connects with Account index 2, checks eligibility, submits a vote for Alice, and prints the transaction hash, confirmation receipt, and updated vote counts.
 
+### 6. (Optional) Reset Votes to `0 / 0` Without Restarting the Node
+To start a fresh election without restarting `npx hardhat node` or clearing MetaMask activity data:
+
+```bash
+npm run reset
+```
+
+This deploys a fresh `Voting` contract via Account #19, initializes `Alice` and `Bob` with 0 votes, and automatically updates `frontend/src/contracts/contractConfig.js` and `ignition/deployments/chain-31337/deployed_addresses.json`.
+
 ---
 
 ## Running Unit Tests
@@ -257,14 +269,21 @@ cd ~/BlockchainProjects/VotingDApp
 npx hardhat test
 ```
 
-All 11 unit tests will run against Hardhat's in-memory simulated environment:
-- Owner deployment verification
-- Candidate initialization (Alice #1, Bob #2)
-- Zero initial vote counts
-- Vote casting and increment verification
-- Double-voting prevention
-- Invalid candidate ID rejection
+All 16 unit tests run against Hardhat's in-memory simulated environment:
+- Owner deployment verification & initial candidate count
+- Candidate initialization (`Alice` #1, `Bob` #2) & zero initial vote counts
+- Vote casting, `VoteCast` event emission, and vote count increments
+- Double-voting & cross-candidate double-voting prevention
+- Invalid candidate ID & zero-candidate voting rejection
 - Non-owner candidate addition rejection
+- Empty/whitespace-only and case-insensitive duplicate candidate name rejection
+- Multi-voter (5+ voters across 4 candidates) election accuracy
+
+To run the frontend UI & integration tests (8 Vitest tests):
+
+```bash
+npm --prefix frontend test
+```
 
 To typecheck the TypeScript files:
 
@@ -277,13 +296,9 @@ npx tsc --noEmit
 ## Troubleshooting
 
 ### 1. "Nonce too high" or "MetaMask Nonce Mismatch" (NONCE_MISMATCH)
-- **Cause**: Restarting `npx hardhat node` resets the blockchain's transaction count back to block 0, but MetaMask's internal database remembers previous nonces for that account.
-- **Solution**:
-  1. Open the MetaMask extension.
-  2. Click the gear icon (**Settings**) or the account circle > **Settings**.
-  3. Navigate to **Advanced**.
-  4. Scroll down and click **Clear activity tab data** (in older versions: **Reset Account**).
-  5. This clears MetaMask's transaction cache and syncs nonces with the local node. Your accounts and private keys are preserved.
+- **Cause**: Restarting `npx hardhat node` resets the blockchain's transaction count back to block 0, while MetaMask's internal database remembers previous nonces for that account.
+- **Automatic Recovery**: On Hardhat Local, the frontend automatically detects `Nonce too high`, calls `hardhat_setNonce` to match MetaMask's cached nonce, and retries the transaction.
+- **Manual Fallback**: If a nonce mismatch persists (e.g., `Nonce too low`), open MetaMask **Settings > Advanced > Clear activity tab data**. Your accounts and private keys are preserved.
 
 ### 2. "Wrong Network" Warning in Frontend
 - **Cause**: MetaMask is connected to Ethereum Mainnet, Sepolia, or another network.
@@ -303,4 +318,4 @@ npx tsc --noEmit
 
 ## License
 
-This project is open source and available under the [MIT License](LICENSE).
+This project is open source and available under the **MIT License**.

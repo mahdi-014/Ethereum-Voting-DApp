@@ -34,3 +34,11 @@ frontend/dist/
 # Editor / OS files
 .DS_Store
 Thumbs.db
+
+# AI assistant / agent config & lab manual PDFs
+.agents/
+.claude/
+.claude
+AGENTS.md
+CLAUDE.md
+*.pdf

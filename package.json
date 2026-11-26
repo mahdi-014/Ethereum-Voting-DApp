@@ -3,7 +3,8 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "vote": "hardhat run --network localhost scripts/cast-vote.js"
+    "vote": "hardhat run --network localhost scripts/cast-vote.js",
+    "reset": "hardhat run --network localhost scripts/reset-votes.ts"
   },
   "devDependencies": {
     "@nomicfoundation/hardhat-ethers": "^4.2.2",

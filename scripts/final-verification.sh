@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -e
-source /home/thefool/.nvm/nvm.sh
+if [ -s "$HOME/.nvm/nvm.sh" ]; then
+  source "$HOME/.nvm/nvm.sh"
+fi
 
 echo "=========================================="
 echo "1. HARDHAT COMPILE"
@@ -18,14 +20,17 @@ echo "=========================================="
 npx tsc --noEmit
 
 echo "=========================================="
-echo "4. FRONTEND PRODUCTION BUILD"
+echo "4. FRONTEND UI & INTEGRATION TESTS"
 echo "=========================================="
-cd frontend
-npm run build
-cd ..
+npm --prefix frontend test
 
 echo "=========================================="
-echo "5. VERIFY CONTRACT ON LOCALHOST"
+echo "5. FRONTEND PRODUCTION BUILD"
+echo "=========================================="
+npm --prefix frontend run build
+
+echo "=========================================="
+echo "6. VERIFY CONTRACT ON LOCALHOST"
 echo "=========================================="
 npx hardhat run --network localhost scripts/verify-voting.ts
 

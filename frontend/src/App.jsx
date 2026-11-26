@@ -1,9 +1,91 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { ethers } from 'ethers';
 import VotingAbi from './contracts/Voting.json';
 import { CONTRACT_ADDRESS, CHAIN_ID, RPC_URL } from './contracts/contractConfig.js';
 
 const TARGET_CHAIN_ID_HEX = '0x' + CHAIN_ID.toString(16); // 0x7a69 for 31337
+
+/**
+ * Extracts normalized error fields and searchable lowercase text from MetaMask and ethers.js v6 errors.
+ */
+function extractErrorContext(err) {
+  const code = err.code || err.info?.error?.code || 'N/A';
+  const shortMessage = err.shortMessage || '';
+  const message = err.message || '';
+  const reason = err.reason || '';
+  const data = err.data || err.info?.error?.data || '';
+  const info = err.info;
+  const cause = err.cause;
+  const nestedError = err.info?.error || err.error || err.cause;
+  const nestedMsg = nestedError?.message || nestedError?.data?.message || '';
+
+  const serializedInfo = (() => {
+    try {
+      return info ? JSON.stringify(info) : '';
+    } catch {
+      return '';
+    }
+  })();
+
+  const fullText = `${message} ${shortMessage} ${reason} ${nestedMsg} ${
+    typeof data === 'string' ? data : JSON.stringify(data || '')
+  } ${serializedInfo}`.toLowerCase();
+
+  return {
+    code,
+    shortMessage,
+    message,
+    reason,
+    data,
+    info,
+    cause,
+    nestedMsg,
+    fullText,
+  };
+}
+
+/**
+ * Parses the MetaMask nonce from a "Nonce too high" RPC error so the local Hardhat node can sync to it.
+ */
+function parseNonceTooHighTarget(err) {
+  if (!err) return null;
+  const { fullText } = extractErrorContext(err);
+  if (!fullText.includes('nonce too high')) return null;
+
+  const match =
+    fullText.match(/expected\s+(?:nonce\s+to\s+be\s+)?\d+\s+but\s+got\s+(\d+)/i) ||
+    fullText.match(/\bgot\s+(\d+)\b/i);
+  if (!match) return null;
+
+  const parsed = Number(match[1]);
+  return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : null;
+}
+
+/**
+ * Advances the local Hardhat node nonce to match MetaMask's cached nonce, bypassing manual activity resets.
+ */
+async function syncHardhatNodeNonce(accountAddress, targetNonce) {
+  if (!accountAddress || targetNonce === null || targetNonce === undefined) return false;
+  let syncProvider = null;
+  try {
+    syncProvider = new ethers.JsonRpcProvider(RPC_URL, undefined, {
+      cacheTimeout: -1,
+      staticNetwork: true,
+    });
+    if (typeof syncProvider.send !== 'function') {
+      return false;
+    }
+    const hexNonce = '0x' + BigInt(targetNonce).toString(16);
+    await syncProvider.send('hardhat_setNonce', [accountAddress, hexNonce]);
+    return true;
+  } catch {
+    return false;
+  } finally {
+    if (syncProvider && typeof syncProvider.destroy === 'function') {
+      syncProvider.destroy();
+    }
+  }
+}
 
 /**
  * Diagnoses and categorizes errors from MetaMask and ethers.js v6.
@@ -19,19 +101,17 @@ function diagnoseError(err) {
     };
   }
 
-  const code = err.code || err.info?.error?.code || 'N/A';
-  const shortMessage = err.shortMessage || '';
-  const message = err.message || '';
-  const reason = err.reason || '';
-  const data = err.data || err.info?.error?.data || '';
-  const info = err.info;
-  const cause = err.cause;
-  const nestedError = err.info?.error || err.error || err.cause;
-  const nestedMsg = nestedError?.message || nestedError?.data?.message || '';
-
-  const fullText = `${message} ${shortMessage} ${reason} ${nestedMsg} ${
-    typeof data === 'string' ? data : JSON.stringify(data || '')
-  }`.toLowerCase();
+  const {
+    code,
+    shortMessage,
+    message,
+    reason,
+    data,
+    info,
+    cause,
+    nestedMsg,
+    fullText,
+  } = extractErrorContext(err);
 
   const raw = {
     code,
@@ -194,7 +274,16 @@ function App() {
     diag: null,
   });
 
-  const isWrongNetwork = Boolean(account && currentChainId && currentChainId !== CHAIN_ID);
+  const accountRef = useRef(account);
+  const manuallyDisconnectedRef = useRef(false);
+  const loadRequestIdRef = useRef(0);
+
+  useEffect(() => {
+    accountRef.current = account;
+  }, [account]);
+
+  const isWrongNetwork = Boolean(currentChainId && currentChainId !== CHAIN_ID);
+  const totalVotes = candidates.reduce((sum, c) => sum + c.voteCount, 0);
 
   // Shorten address for display
   const formatAddress = (addr) => {
@@ -203,15 +292,35 @@ function App() {
   };
 
   // Fetch candidate list, balance, and voting eligibility from blockchain
-  const loadBlockchainData = useCallback(async (currentAccount = account) => {
+  const loadBlockchainData = useCallback(async (explicitAccount) => {
+    const requestId = ++loadRequestIdRef.current;
+    const currentAccount =
+      explicitAccount !== undefined ? explicitAccount : accountRef.current;
+
     setIsLoading(true);
+    let readProvider = null;
     try {
-      const provider = window.ethereum
-        ? new ethers.BrowserProvider(window.ethereum)
-        : new ethers.JsonRpcProvider(RPC_URL);
+      if (window.ethereum) {
+        try {
+          const browserProvider = new ethers.BrowserProvider(window.ethereum);
+          const net = await browserProvider.getNetwork();
+          setCurrentChainId(Number(net.chainId));
+        } catch {
+          // Ignore network probe failure and still read from local RPC
+        }
+      }
+
+      // Always read contract state directly from the local RPC node with caching disabled
+      // so MetaMask's internal RPC cache never serves stale vote counts across votes or node resets.
+      readProvider = new ethers.JsonRpcProvider(RPC_URL, undefined, {
+        cacheTimeout: -1,
+        staticNetwork: true,
+      });
 
       // Verify contract bytecode exists at target address
-      const code = await provider.getCode(CONTRACT_ADDRESS);
+      const code = await readProvider.getCode(CONTRACT_ADDRESS);
+      if (requestId !== loadRequestIdRef.current) return;
+
       if (code === '0x' || code.length <= 2) {
         setTxStatus({
           type: 'error',
@@ -224,12 +333,11 @@ function App() {
             raw: { code: 'BAD_DATA' },
           },
         });
-        setIsLoading(false);
         return;
       }
 
       // Create read-only contract instance
-      const contract = new ethers.Contract(CONTRACT_ADDRESS, VotingAbi, provider);
+      const contract = new ethers.Contract(CONTRACT_ADDRESS, VotingAbi, readProvider);
 
       // 1. Read candidateCount()
       let count = 0;
@@ -237,6 +345,7 @@ function App() {
         const countBig = await contract.candidateCount();
         count = Number(countBig);
       } catch (countErr) {
+        if (requestId !== loadRequestIdRef.current) return;
         console.error('Error calling candidateCount():', countErr);
         const diag = diagnoseError(countErr);
         setTxStatus({
@@ -245,7 +354,6 @@ function App() {
           hash: null,
           diag,
         });
-        setIsLoading(false);
         return;
       }
 
@@ -260,6 +368,7 @@ function App() {
             voteCount: Number(c.voteCount),
           });
         } catch (candErr) {
+          if (requestId !== loadRequestIdRef.current) return;
           console.error(`Error calling candidates(${i}):`, candErr);
           const diag = diagnoseError(candErr);
           setTxStatus({
@@ -268,28 +377,34 @@ function App() {
             hash: null,
             diag,
           });
-          setIsLoading(false);
           return;
         }
       }
 
+      if (requestId !== loadRequestIdRef.current) return;
       setCandidates(items);
 
       // 3. Check voting eligibility and balance if account is connected
       if (currentAccount) {
         try {
           const voted = await contract.hasVoted(currentAccount);
-          setHasVoted(voted);
+          if (requestId === loadRequestIdRef.current) {
+            setHasVoted(voted);
+          }
         } catch (votedErr) {
           console.warn('Could not read hasVoted for account:', votedErr);
         }
 
         try {
-          const bal = await provider.getBalance(currentAccount);
-          setAccountBalance(ethers.formatEther(bal));
+          const bal = await readProvider.getBalance(currentAccount);
+          if (requestId === loadRequestIdRef.current) {
+            setAccountBalance(ethers.formatEther(bal));
+          }
         } catch (balErr) {
           console.warn('Could not fetch account balance:', balErr);
-          setAccountBalance(null);
+          if (requestId === loadRequestIdRef.current) {
+            setAccountBalance(null);
+          }
         }
       } else {
         setHasVoted(false);
@@ -309,6 +424,7 @@ function App() {
         return prev;
       });
     } catch (err) {
+      if (requestId !== loadRequestIdRef.current) return;
       console.error('Error loading blockchain data:', err);
       const diag = diagnoseError(err);
       setTxStatus({
@@ -318,15 +434,20 @@ function App() {
         diag,
       });
     } finally {
-      setIsLoading(false);
+      if (readProvider && typeof readProvider.destroy === 'function') {
+        readProvider.destroy();
+      }
+      if (requestId === loadRequestIdRef.current) {
+        setIsLoading(false);
+      }
     }
-  }, [account]);
+  }, []);
 
-  // Check MetaMask installation and initial connection
+  // Check MetaMask installation, initial connection, and event listeners once on mount
   useEffect(() => {
     if (!window.ethereum) {
       setIsMetaMaskInstalled(false);
-      loadBlockchainData();
+      loadBlockchainData(null);
       return;
     }
 
@@ -340,18 +461,21 @@ function App() {
     }).catch(console.error);
 
     provider.listAccounts().then((accounts) => {
-      if (accounts.length > 0) {
+      if (!manuallyDisconnectedRef.current && accounts.length > 0) {
         const userAddr = accounts[0].address;
         setAccount(userAddr);
         loadBlockchainData(userAddr);
       } else {
         loadBlockchainData(null);
       }
-    }).catch(console.error);
+    }).catch(() => {
+      loadBlockchainData(null);
+    });
 
     // Event listeners
     const handleAccountsChanged = (accounts) => {
       if (accounts && accounts.length > 0) {
+        manuallyDisconnectedRef.current = false;
         const newAccount = accounts[0];
         setAccount(newAccount);
         setTxStatus({
@@ -399,6 +523,7 @@ function App() {
     }
 
     try {
+      manuallyDisconnectedRef.current = false;
       setTxStatus({ type: 'info', message: 'Connecting to MetaMask...', hash: null, diag: null });
 
       // 1. Request wallet permission independently
@@ -443,8 +568,9 @@ function App() {
     }
   };
 
-  // Disconnect UI action (resets local UI session)
+  // Disconnect UI action (resets local UI session and prevents immediate auto-reconnect)
   const disconnectWallet = () => {
+    manuallyDisconnectedRef.current = true;
     setAccount(null);
     setHasVoted(false);
     setAccountBalance(null);
@@ -571,7 +697,25 @@ function App() {
         diag: null,
       });
 
-      const tx = await contract.vote(candidateId);
+      let tx = null;
+      for (let attempt = 0; attempt < 3; attempt++) {
+        try {
+          tx = await contract.vote(candidateId);
+          break;
+        } catch (sendErr) {
+          const targetNonce = attempt < 2 ? parseNonceTooHighTarget(sendErr) : null;
+          if (targetNonce !== null && (await syncHardhatNodeNonce(currentActiveAccount, targetNonce))) {
+            setTxStatus({
+              type: 'pending',
+              message: `Synced local Hardhat nonce to #${targetNonce} to match MetaMask cache. Retrying vote for ${candidateName} — please confirm in MetaMask...`,
+              hash: null,
+              diag: null,
+            });
+            continue;
+          }
+          throw sendErr;
+        }
+      }
 
       setTxStatus({
         type: 'pending',
@@ -697,7 +841,12 @@ function App() {
 
         {/* Action Controls */}
         <div className="controls-bar">
-          <h2>Registered Candidates</h2>
+          <div className="controls-heading">
+            <h2>Registered Candidates</h2>
+            <span className="total-votes-badge" data-testid="total-votes">
+              Total Votes: {totalVotes}
+            </span>
+          </div>
           <button
             className="btn btn-secondary"
             onClick={() => loadBlockchainData(account)}

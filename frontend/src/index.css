@@ -290,6 +290,22 @@ body {
   color: var(--text-main);
 }
 
+.controls-heading {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.total-votes-badge {
+  background-color: #e0f2fe;
+  color: #0369a1;
+  font-size: 0.85rem;
+  font-weight: 600;
+  padding: 0.25rem 0.65rem;
+  border-radius: 9999px;
+}
+
 /* Buttons */
 .btn {
   display: inline-flex;
